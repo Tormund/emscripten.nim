@@ -11,7 +11,7 @@ type
 macro declTypeWithHeader(h: static[string]): stmt =
     result = parseStmt("type DummyHeaderType {.importc: \"void\", header:\"" & $h & "\".} = object")
 
-template ensureHeaderIncluded(h: static[string]) =
+template ensureHeaderIncluded(h: static[string]): stmt =
     block:
         declTypeWithHeader(h)
         var tht : ptr DummyHeaderType = nil
@@ -83,37 +83,76 @@ template EM_ASM*(code: static[string]) =
     ensureHeaderIncluded("<emscripten.h>")
     {.emit: "EM_ASM(" & code & ");".}
 
-template EM_ASM_INT*(code: static[string]): cint =
-    block:
-        ensureHeaderIncluded("<emscripten.h>")
-        var emintres {.exportc.}: cint
-        {.emit: "emintres = EM_ASM_INT_V({" & code & "});".}
-        emintres
+macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
+    result = newNimNode(nnkStmtList)
+    result.add(newCall(bindSym "ensureHeaderIncluded", newLit("<emscripten.h>")))
 
-#TODO: Fix copy-paste
-template EM_ASM_INT*(code: static[string], arg1: typed): cint =
-    block:
-        ensureHeaderIncluded("<emscripten.h>")
-        var emintres {.exportc.}: cint
-        let emintarg1 {.exportc.} = arg1
-        {.emit: "emintres = EM_ASM_INT({" & code & "}, emintarg1);".}
-        emintres
+    result.add(
+        newNimNode(nnkVarSection).add(
+            newNimNode(nnkIdentDefs).add(
+                newNimNode(nnkPragmaExpr).add(
+                    newIdentNode("emintres"),
+                    newNimNode(nnkPragma).add(
+                        newIdentNode("exportc")
+                    )
+                ),
+                newIdentNode("cint"),
+                newEmptyNode()
+            )
+        )
+    )
 
-template EM_ASM_INT*(code: static[string], arg1: typed, arg2: typed): cint =
-    block:
-        ensureHeaderIncluded("<emscripten.h>")
-        var emintres {.exportc.}: cint
-        let emintarg1 {.exportc.} = arg1
-        let emintarg2 {.exportc.} = arg2
-        {.emit: "emintres = EM_ASM_INT({" & code & "}, emintarg1, emintarg2);".}
-        emintres
+    var emitStr = ""
+    if args.len == 0:
+        emitStr = "emintres = EM_ASM_INT_V({" & code & "});"
+    else:
+        let argsSection = newNimNode(nnkLetSection)
+        for i in 0 ..< args.len:
+            argsSection.add(
+                newNimNode(nnkIdentDefs).add(
+                    newNimNode(nnkPragmaExpr).add(
+                        newIdentNode("emintarg" & $i),
+                        newNimNode(nnkPragma).add(
+                            newIdentNode("exportc")
+                        )
+                    ),
+                    newEmptyNode(),
+                    args[i]
+                )
+            )
+        result.add(argsSection)
+        emitStr = "emintres = EM_ASM_INT({" & code & "}"
+        for i in 0 ..< args.len:
+            emitStr &= ", emintarg" & $i
+        emitStr &= ");"
 
-template EM_ASM_INT*(code: static[string], arg1: typed, arg2: typed, arg3: typed): cint =
+    result.add(
+        newNimNode(nnkPragma).add(
+            newNimNode(nnkExprColonExpr).add(
+                newIdentNode("emit"),
+                newLit(emitStr)
+            )
+        )
+    )
+
+    result.add(newIdentNode("emintres"))
+
+    result = newNimNode(nnkBlockStmt).add(
+        newEmptyNode(),
+        result
+    )
+
+#[
+dumpTree:
     block:
         ensureHeaderIncluded("<emscripten.h>")
         var emintres {.exportc.}: cint
-        let emintarg1 {.exportc.} = arg1
-        let emintarg2 {.exportc.} = arg2
-        let emintarg3 {.exportc.} = arg3
-        {.emit: "emintres = EM_ASM_INT({" & code & "}, emintarg1, emintarg2, emintarg3);".}
+        var arg1 = 0
+        var arg2 = 0
+        let
+            emintarg1 {.exportc.} = arg1
+            emintarg2 {.exportc.} = arg2
+
+        {.emit: "emintres = EM_ASM_INT({" & "asdf" & "}, emintarg1);".}
         emintres
+]#
