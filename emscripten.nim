@@ -52,6 +52,9 @@ type EmscriptenMouseEvent* = object
     padding*: clong
 
 type em_callback_func* = proc() {.cdecl.}
+type em_arg_callback_func* = proc(p: pointer) {.cdecl.}
+type em_str_callback_func* = proc(s: cstring) {.cdecl.}
+type em_async_wget_onload_func* = proc(a: pointer, p: pointer, sz: cint) {.cdecl.}
 type em_mouse_callback_func* = proc(eventType: cint, mouseEvent: ptr EmscriptenMouseEvent, userData: pointer): EM_BOOL {.cdecl.}
 
 {.push importc.}
@@ -63,6 +66,8 @@ proc emscripten_cancel_main_loop*()
 
 proc emscripten_set_mousedown_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_mouse_callback_func): EMSCRIPTEN_RESULT
 proc emscripten_set_mouseup_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_mouse_callback_func): EMSCRIPTEN_RESULT
+
+proc emscripten_async_wget_data*(url: cstring, arg: pointer, onload: em_async_wget_onload_func, onerror: em_arg_callback_func)
 {.pop.}
 
 macro EMSCRIPTEN_KEEPALIVE*(someProc: typed): typed =
@@ -141,6 +146,30 @@ macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
         newEmptyNode(),
         result
     )
+
+proc emscripten_async_wget_data*(url: cstring, onload: proc(data: pointer, sz: cint), onerror: proc()) =
+    ## Helper wrapper for emscripten_async_wget_data to pass nim closures around
+    type Ctx = ref object
+        onload: proc(data: pointer, sz: cint)
+        onerror: proc()
+
+    var ctx: Ctx
+    ctx.new()
+    ctx.onload = onload
+    ctx.onerror = onerror
+    GC_ref(ctx)
+
+    proc onLoadWrapper(arg: pointer, data: pointer, sz: cint) {.cdecl.} =
+        let c = cast[Ctx](arg)
+        GC_unref(c)
+        c.onload(data, sz)
+
+    proc onErrorWrapper(arg: pointer) {.cdecl.} =
+        let c = cast[Ctx](arg)
+        GC_unref(c)
+        c.onerror()
+
+    emscripten_async_wget_data(url, cast[pointer](ctx), onLoadWrapper, onErrorWrapper)
 
 #[
 dumpTree:
