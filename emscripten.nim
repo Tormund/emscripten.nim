@@ -69,6 +69,21 @@ type EmscriptenWheelEvent* = object
     deltaZ*: cdouble
     deltaMode*: culong
 
+type EmscriptenKeyboardEvent* = object
+    key*: array[32, char]
+    code*: array[32, char]
+    location*: culong
+    ctrlKey*: EM_BOOL
+    shiftKey*: EM_BOOL
+    altKey*: EM_BOOL
+    metaKey*: EM_BOOL
+    repeat*: EM_BOOL
+    locale*: array[32, char]
+    charValue*: array[32, char]
+    charCode*: culong
+    keyCode*: culong
+    which*: culong
+
 type em_callback_func* = proc() {.cdecl.}
 type em_arg_callback_func* = proc(p: pointer) {.cdecl.}
 type em_str_callback_func* = proc(s: cstring) {.cdecl.}
@@ -76,6 +91,8 @@ type em_async_wget_onload_func* = proc(a: pointer, p: pointer, sz: cint) {.cdecl
 type em_mouse_callback_func* = proc(eventType: cint, mouseEvent: ptr EmscriptenMouseEvent, userData: pointer): EM_BOOL {.cdecl.}
 type em_ui_callback_func* = proc (eventType: cint, uiEvent: ptr EmscriptenUiEvent, userData: pointer): EM_BOOL {.cdecl.}
 type em_wheel_callback_func* = proc(eventType: cint, wheelEvent: ptr EmscriptenWheelEvent, userData: pointer): EM_BOOL {.cdecl.}
+type em_key_callback_func* = proc(eventType: cint, keyEvent: ptr EmscriptenKeyboardEvent, userData: pointer): EM_BOOL {.cdecl.}
+
 
 {.push importc.}
 proc emscripten_webgl_init_context_attributes*(attributes: ptr EmscriptenWebGLContextAttributes)
@@ -96,6 +113,10 @@ proc emscripten_set_scroll_callback*(target: cstring, userData: pointer, useCapt
 proc emscripten_get_mouse_status*(mouseState: ptr EmscriptenMouseEvent): EMSCRIPTEN_RESULT
 
 proc emscripten_async_wget_data*(url: cstring, arg: pointer, onload: em_async_wget_onload_func, onerror: em_arg_callback_func)
+
+proc emscripten_set_keypress_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_key_callback_func): EMSCRIPTEN_RESULT
+proc emscripten_set_keydown_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_key_callback_func): EMSCRIPTEN_RESULT
+proc emscripten_set_keyup_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_key_callback_func): EMSCRIPTEN_RESULT
 {.pop.}
 
 macro EMSCRIPTEN_KEEPALIVE*(someProc: typed): typed =
