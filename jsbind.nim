@@ -300,11 +300,9 @@ elif defined(emscripten):
         jsImportAux(p, true, $name)
 
     macro jsimport*(p: untyped): typed =
-        echo treeRepr(p)
         jsImportAux(p, true, p.unpackedName)
 
     macro jsimportg*(p: untyped): typed =
-        echo treeRepr(p)
         jsImportAux(p, false, p.unpackedName)
 
     macro jsimportgWithName*(name: string, p: untyped): typed =
