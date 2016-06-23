@@ -158,7 +158,6 @@ elif defined(emscripten):
         result = newNimNode(nnkBracket)
         let t = getType(p)
         for i in 2 ..< t.len:
-            echo "I ", i, ": ", treeRepr(t[i])
             result.add(newCall(s, newLit(i - 2), newCall("type", getType(t[i]))))
 
     template jsConvertJSToNim(t: typedesc, code: string): string =
