@@ -119,6 +119,14 @@ proc emscripten_set_keydown_callback*(target: cstring, userData: pointer, useCap
 proc emscripten_set_keyup_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_key_callback_func): EMSCRIPTEN_RESULT
 {.pop.}
 
+proc addPragma*(someProc, pragma: NimNode) =
+    ## Adds pragma to callable definition
+    var pragmaNode = someProc.pragma
+    if pragmaNode.isNil or pragmaNode.kind == nnkEmpty:
+        pragmaNode = newNimNode(nnkPragma)
+        someProc.pragma = pragmaNode
+    pragmaNode.add(pragma)
+
 macro EMSCRIPTEN_KEEPALIVE*(someProc: typed): typed =
     result = someProc
     #[
@@ -127,9 +135,8 @@ macro EMSCRIPTEN_KEEPALIVE*(someProc: typed): typed =
         Ident !"codegenDecl"
         StrLit __attribute__((used)) $# $#$#
     ]#
-    result.pragma = newNimNode(nnkPragma).add(
-        newIdentNode("exportc"),
-        newNimNode(nnkExprColonExpr).add(
+    result.addPragma(newIdentNode("exportc"))
+    result.addPragma(newNimNode(nnkExprColonExpr).add(
             newIdentNode("codegenDecl"),
             newLit("__attribute__((used)) $# $#$#")))
 
@@ -137,7 +144,9 @@ template EM_ASM*(code: static[string]) =
     ensureHeaderIncluded("<emscripten.h>")
     {.emit: "EM_ASM(" & code & ");".}
 
-macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
+proc emAsmAux*(code: string, args: NimNode, resTypeName, emResType: string): NimNode =
+    #echo "CODE: ", code
+
     result = newNimNode(nnkStmtList)
     result.add(newCall(bindSym "ensureHeaderIncluded", newLit("<emscripten.h>")))
 
@@ -150,7 +159,7 @@ macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
                         newIdentNode("exportc")
                     )
                 ),
-                newIdentNode("cint"),
+                newIdentNode(resTypeName),
                 newEmptyNode()
             )
         )
@@ -158,7 +167,7 @@ macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
 
     var emitStr = ""
     if args.len == 0:
-        emitStr = "emintres = EM_ASM_INT_V({" & code & "});"
+        emitStr = "emintres = EM_ASM_" & emResType & "_V({" & code & "});"
     else:
         let argsSection = newNimNode(nnkLetSection)
         for i in 0 ..< args.len:
@@ -175,7 +184,7 @@ macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
                 )
             )
         result.add(argsSection)
-        emitStr = "emintres = EM_ASM_INT({" & code & "}"
+        emitStr = "emintres = EM_ASM_" & emResType & "({" & code & "}"
         for i in 0 ..< args.len:
             emitStr &= ", emintarg" & $i
         emitStr &= ");"
@@ -195,6 +204,12 @@ macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
         newEmptyNode(),
         result
     )
+
+macro EM_ASM_INT*(code: static[string], args: varargs[typed]): cint =
+    result = emAsmAux(code, args, "cint", "INT")
+
+macro EM_ASM_DOUBLE*(code: static[string], args: varargs[typed]): cdouble =
+    result = emAsmAux(code, args, "cdouble", "DOUBLE")
 
 proc emscripten_async_wget_data*(url: cstring, onload: proc(data: pointer, sz: cint), onerror: proc()) =
     ## Helper wrapper for emscripten_async_wget_data to pass nim closures around
