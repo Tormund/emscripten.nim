@@ -84,6 +84,10 @@ type EmscriptenKeyboardEvent* = object
     keyCode*: culong
     which*: culong
 
+type EmscriptenFocusEvent* = object
+    nodeName*: array[128, char]
+    id*: array[128, char]
+
 type em_callback_func* = proc() {.cdecl.}
 type em_arg_callback_func* = proc(p: pointer) {.cdecl.}
 type em_str_callback_func* = proc(s: cstring) {.cdecl.}
@@ -92,7 +96,7 @@ type em_mouse_callback_func* = proc(eventType: cint, mouseEvent: ptr EmscriptenM
 type em_ui_callback_func* = proc (eventType: cint, uiEvent: ptr EmscriptenUiEvent, userData: pointer): EM_BOOL {.cdecl.}
 type em_wheel_callback_func* = proc(eventType: cint, wheelEvent: ptr EmscriptenWheelEvent, userData: pointer): EM_BOOL {.cdecl.}
 type em_key_callback_func* = proc(eventType: cint, keyEvent: ptr EmscriptenKeyboardEvent, userData: pointer): EM_BOOL {.cdecl.}
-
+type em_focus_callback_func* = proc(eventType: cint, focusEvet: ptr EmscriptenFocusEvent, userData: pointer): EM_BOOL {.cdecl.}
 
 {.push importc.}
 proc emscripten_webgl_init_context_attributes*(attributes: ptr EmscriptenWebGLContextAttributes)
@@ -117,6 +121,9 @@ proc emscripten_async_wget_data*(url: cstring, arg: pointer, onload: em_async_wg
 proc emscripten_set_keypress_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_key_callback_func): EMSCRIPTEN_RESULT
 proc emscripten_set_keydown_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_key_callback_func): EMSCRIPTEN_RESULT
 proc emscripten_set_keyup_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_key_callback_func): EMSCRIPTEN_RESULT
+
+proc emscripten_set_blur_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_focus_callback_func): EMSCRIPTEN_RESULT
+proc emscripten_set_focus_callback*(target: cstring, userData: pointer, useCapture: EM_BOOL, callback: em_focus_callback_func): EMSCRIPTEN_RESULT
 {.pop.}
 
 proc addPragma*(someProc, pragma: NimNode) =
